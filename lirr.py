@@ -4,11 +4,6 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 
-#VARIABLES
-
-origin_station="BABYLON"
-branch="BABYLON"
-
 
 #TODO
 #Get the route numbers for each route using routes.txt
@@ -16,19 +11,7 @@ branch="BABYLON"
 route_id="1"
 
 #TODO
-#Get the stop_ids from stops.txt 
-#hardcode to Babylon (118) for now
-#Syosset - 58
-#hardcode destination to Penn Station(8)
-#hardcode destination to Hunterspoint Ave(2)
-#hardcode destination to Atlantic Terminal(12)
-origin_stop_id="118"
-dest_stop_id="8"
-dest_station='PENN STATION'
-#dest_stop_id="12"
-#dest_station='ATLANTIC TERMINAL'
-JAMAICA='JAMAICA'
-jamaica_stop_id='15'
+#Get the stop_ids from stops.txt
 
 # get the valid service ids for today's date from calendar_dates.txt
 def getDates():
@@ -47,15 +30,13 @@ def getDates():
 
 #get the trip ids from trips.txt for the requested destination
 def getTrips(destination):
-        trip_ids=[]
+        trip_ids={}
         trip_lst=[]
         trips = csv.reader(open('trips.txt'))
-
         for row in trips:
            if row[1] in service_ids:
-             if row[3].upper()==destination:
-               trip_lst.append(row[2])
-        trip_ids=dict.fromkeys(trip_lst)
+             if row[3]==destination and row[5]=='1':
+               trip_ids[row[2]]=row[3]
         return(trip_ids)       
    
 #get the stop_times from stop_times.txt
@@ -81,9 +62,9 @@ def getTrains(trips,origin_stop_id):
                  hr="23"
                  if hr=="24":
                    offset=1
-                   if hr=="25":
-                     offset=2
-                   time1=hr+rest
+                 if hr=="25":
+                   offset=2
+                 time1=hr+rest
               time2=row[2]
               hr=time2[0:2]
               rest=time2[2:8]
@@ -94,56 +75,61 @@ def getTrains(trips,origin_stop_id):
                    offset=2
                  hr="23"
                  time2=hr+rest
-              dtm=datetime.strptime(today+time2,"%Y%m%d%H:%M:%S")+timedelta(hours=offset)
-              if dtm > curr_time:
-                times_dct[row[0]]=dtm
+              depart_dtm=datetime.strptime(today+time2,"%Y%m%d%H:%M:%S")+timedelta(hours=offset)
+              arrival_dtm=datetime.strptime(today+time1,"%Y%m%d%H:%M:%S")+timedelta(hours=offset)
+              if depart_dtm > curr_time:
+                times_dct[row[0]]=[depart_dtm,arrival_dtm]
         return(times_dct)
 
 def showTimes(times):
 
-   sorted_list = [(k,v) for v,k in sorted(
-                    [(v,k) for k,v in times.items()]
-                    )
-                 ]
-
-   for row in sorted_list:
-     print row[1].strftime("%I %M")
-     #print row[0]
+   times_list=[]
+   times_list=times.values();
+   times_list.sort()
+   for row in times_list:
+      print "arrival time "+row[0].strftime("%I %M") + " departure time "+row[1].strftime("%I %M")
 
    return 
 
+def getEndStops(origin):
+        endStops={}
+        trips = csv.reader(open('trips.txt'))
+        for row in trips:
+           if row[1] in service_ids:
+              if row[5]=='1' and row[3] != origin:  #make sure the direction is westbound and the headsign is not the origin 
+                 endStops[row[3]]=1
+
+        return(endStops)      
+
 today=date.today().strftime("%Y%m%d")
-curr_time=datetime.now()#- timedelta(hours=4)
+curr_time=datetime.now()
+origin='Babylon'   
+origin_stop_id='118' #Babylon
+dest_station='Penn Station'
+#dest_station='Atlantic Terminal'
 
 getDates()
 getStopTimes()
+endStops=getEndStops(origin)
+#for each of the endStops, get a list of trips
+all_trips={}
+for row in endStops:
+   trips=getTrips(row)
+   all_trips.update(trips)
 
-#get all trains that go direct
-trip_ids=getTrips(dest_station)
-origin_stop_id='118' #Babylon
-times_dct=getTrains(trip_ids,origin_stop_id)
-print "Direct trains"
-showTimes(times_dct)
-#get trains that stop at jamacia
-dest_station='JAMAICA'
-trip_ids=getTrips(dest_station)
-times_dct=getTrains(trip_ids,origin_stop_id)
-print "Change at Jamaica"
-showTimes(times_dct)
-#get trains that start at Jamacia and stop at Penn
-dest_station='PENN STATION'
-origin_stop_id='15'
-trip_ids=getTrips(dest_station)
-times_dct=getTrains(trip_ids,origin_stop_id)
-print "Jamacia to Penn"
-#showTimes(times_dct)
-
-
-#times_lst.sort()
-#for row in times_lst:
-#  print row.strftime("%I %M")
-
-
+#get all trips that stop at your origin
+direct={}
+times_dct=getTrains(all_trips,origin_stop_id)
+for key in times_dct:
+   if all_trips[key]==dest_station:
+      direct[key]=times_dct[key]
+showTimes(direct)      
+#get connectors   
+connector={}
+for key in times_dct:
+   if all_trips[key]!=dest_station:
+      connector[key]=times_dct[key]
+showTimes(connector)      
 
 
 
