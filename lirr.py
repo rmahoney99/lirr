@@ -13,6 +13,14 @@ route_id="1"
 
 #TODO
 #Get the stop_ids from stops.txt
+def getStops():
+    stops = csv.reader(open('stops.txt'))
+    stop_names={}
+    stop_ids={}
+    for row in stops:
+      stop_names[row[1]]=row[0]
+      stop_ids[row[0]]=row[1]
+    return stop_names,stop_ids
 
 # get the valid service ids for today's date from calendar_dates.txt
 def getDates():
@@ -105,6 +113,7 @@ dest_station='Penn Station'
 #dest_station='Atlantic Terminal'
 
 getDates()
+stop_names,stop_ids=getStops()
 getStopTimes()
 endStops=getEndStops(origin)
 #for each of the endStops, get a list of trips
