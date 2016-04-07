@@ -8,13 +8,12 @@ from collections import defaultdict
 
 #TODO
 #Get the route numbers for each route using routes.txt
-#hardcode to Babylon for now
-route_id="1"
 
-#TODO
+
 #Get the stop_ids from stops.txt
 def getStops():
     stops = csv.reader(open('stops.txt'))
+    next(stops, None) #skip header
     stop_names={}
     stop_ids={}
     for row in stops:
@@ -22,9 +21,11 @@ def getStops():
       stop_ids[row[0]]=row[1]
     return stop_names,stop_ids
 
+
 # get the valid service ids for today's date from calendar_dates.txt
 def getDates():
         dates = csv.reader(open('calendar_dates.txt'))
+        next(dates, None) #skip header
         svc_ids=[]
 
         for row in dates:
@@ -40,24 +41,29 @@ def getDates():
 #get the trip ids from trips.txt for the requested destination
 def getTrips(destination):
         trip_ids={}
+        routes={}
         trip_lst=[]
         trips = csv.reader(open('trips.txt'))
+        next(trips, None) #skip header
         for row in trips:
            if row[1] in service_ids:
              if row[3]==destination and row[5]=='1':
                trip_ids[row[2]]=row[3]
         return(trip_ids)       
+
    
 #get the stop_times from stop_times.txt
 def getStopTimes():
    global stops_lst
    stops = csv.reader(open('stop_times.txt'))
+   next(stops, None) #skip header
    stops_lst=[]
 
    for row in stops:
      stops_lst.append(row)
    return
 
+# get all trips for the requested station
 def getTrains(trips,origin_stop_id):
         
         times_dct={}
@@ -65,8 +71,7 @@ def getTrains(trips,origin_stop_id):
            if row[0] in trips and ( row[3]==origin_stop_id):
               arrival_dtm=getDatetime(row[1])
               depart_dtm=getDatetime(row[2])
-              if depart_dtm > curr_time:
-                times_dct[row[0]]=[depart_dtm,arrival_dtm]
+              times_dct[row[0]]=[depart_dtm,arrival_dtm]
         return(times_dct)
         
 def getDatetime(time):
@@ -93,29 +98,45 @@ def showTimes(times):
    return 
 
 def getEndStops(origin):
-#        endStops={}
+
         endStops=defaultdict(list)
+        connectors=defaultdict(list)
         trips = csv.reader(open('trips.txt'))
+        next(trips, None) #skip header
         for row in trips:
-           if row[1] in service_ids:
-              if row[5]=='1' and row[3] != origin:  #make sure the direction is westbound and the headsign is not the origin 
+           if row[1] in service_ids:    # trip is valid today
+              if row[5]=='1':          #make sure the direction is westbound  
                  endStops[row[3]].append(row[2])  # for each endStop add a tuple of the trip ids
-#                endStops[row[3]]=1
-        return(endStops)      
-
-
+              if row[3] not in connectors[row[0]]:  # for each route, create a unique list of headsigns
+                 connectors[row[0]].append(row[3])  #which we will call connectors
+        return endStops,connectors
+        
+#trips.txt - contains the route, service_id (relates to day_, trip id, trip headsign (final destination) and direction (1 for westbound)        
+#stops.txt - contains the stop_id and stop_name
+#stop_times.txt - trip id arrival time departure time stop id and stop sequence
+#
+# stop_names - dict - from stops.txt key is stop name, value is stop id
+# stop_ids - dict - from stops.txt key is stop_id, value is stop_name
+# stops_list - global list - from stop_times.txt All stop times values are the trip_id, arrival_time,departure_time,stop_id, stop_sequence
+# end_stops - dict - from trips.txt key is headsign value is a list of trips for that headsign
+# connectors - dict - from trips.txt key is route id, value is the unique list of headsigns for that route
+#times_dct - dict - all trips that stop at the origin - key is trip_id, values are arrival time and depart time 
+#direct  - dict - from times_dict where the key is the destination station
 
 today=date.today().strftime("%Y%m%d")
 curr_time=datetime.now()
 origin='Babylon'   
-origin_stop_id='118' #Babylon
 dest_station='Penn Station'
 #dest_station='Atlantic Terminal'
 
+#get the valid service ids for today
 getDates()
 stop_names,stop_ids=getStops()
 getStopTimes()
-endStops=getEndStops(origin)
+
+endStops, connectors=getEndStops(origin)
+origin_stop_id=stop_names[origin]
+
 #for each of the endStops, get a list of trips
 all_trips={}
 for row in endStops:
@@ -128,14 +149,18 @@ times_dct=getTrains(all_trips,origin_stop_id)
 for key in times_dct:
    if all_trips[key]==dest_station:
       direct[key]=times_dct[key]
-showTimes(direct)      
+     
+#showTimes(direct)      
 #get connectors   
 connector={}
 for key in times_dct:
    if all_trips[key]!=dest_station:
       connector[key]=times_dct[key]
-showTimes(connector)      
-print endStops
+#showTimes(connector)  
+for key in connector:
+   print all_trips[key]
+
+
 
 
 
